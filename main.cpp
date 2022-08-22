@@ -7,27 +7,37 @@
 
 using namespace std;
 
-#define PORT 4001
+#define SERVER_PORT 4001
+#define CLIENT_PORT 4030
 
 int main()
 {
-    int sock = 0, valread, client_fd;
-    struct sockaddr_in serv_addr;
+    int sockfd, valread;
+    struct sockaddr_in serv_addr, cli_addr;
     string hello = "Hello from client";
     char buffer[1024] = {0};
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+
+    if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
         return -1;
+        
+    memset(&serv_addr, 0, sizeof(serv_addr));
+    memset(&cli_addr, 0, sizeof(cli_addr));
+
+    cli_addr.sin_family = AF_INET;
+    cli_addr.sin_port = htons(CLIENT_PORT);
+    cli_addr.sin_addr.s_addr = INADDR_ANY;
+    bind(sockfd, (sockaddr*)&cli_addr, sizeof(cli_addr));
+
     serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-    // Конвертирует адрес ipv4 из текста в бинарь
-    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
-        return -1;
+    serv_addr.sin_port = htons(SERVER_PORT);
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
     
-    client_fd = connect(sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
-    send(sock, hello.c_str(), strlen(hello.c_str()), 0);
-    cout << "Hello message sent\n";
-    valread = recv(sock, buffer, 1024, 0);
+    unsigned int n, len;
+    // MSG_CONFIRM отправляет ответ на датаграмму без ARP
+    sendto(sockfd, hello.c_str(), strlen(hello.c_str()), MSG_CONFIRM, 
+        (sockaddr*)&serv_addr, sizeof(serv_addr));
+    len = sizeof(serv_addr);
+    n = recvfrom(sockfd, buffer, 1024, 0, (sockaddr*)&serv_addr, (socklen_t*)&len);
     cout << buffer;
-    close(client_fd);
-    return 0;
+    close(sockfd);
 }
